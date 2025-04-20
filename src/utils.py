@@ -14,3 +14,9 @@ def set_seed(seed):
         torch.cuda.manual_seed(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = True
+
+
+# Function to check cuda's quality
+def check_cuda_capability():
+    cuda_capability = torch.cuda.get_device_capability()[0]
+    return True if cuda_capability >= 8 else False

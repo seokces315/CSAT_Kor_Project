@@ -6,8 +6,11 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Append to sys.path
 sys.path.append(parent_dir)
 
+from utils import check_cuda_capability
+
 from torch.utils.data import Dataset
 
+import torch
 import pandas as pd
 
 import ast
@@ -28,8 +31,9 @@ def rp_choice(option):
 # Custom dataset for fine-tune EXAONE
 class CSATPromptDataset(Dataset):
     # Generator
-    def __init__(self, df):
+    def __init__(self, df, option):
         self.df = df
+        self.option = option
 
     # Length getter
     def __len__(self):
@@ -38,10 +42,9 @@ class CSATPromptDataset(Dataset):
     # Getter : Wrapped by prompt
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        template = rp_choice(0)
+        template = rp_choice(self.option)
         choices = ast.literal_eval(row["choices"])
         text = (
-            # Role, Persona
             f"{template}\n\n"
             f"<정답률 추정 기준>\n- 정보가 분산된 긴 지문일수록 난이도가 높음\n- 지문과 선택지의 대응이 명확할수록 정답률이 높음\n- 선택지들이 추상적이거나 유사한 표현일 경우 정답률이 낮음\n- 문제 유형이 추론이나 간접적 해석이면 난이도가 높음\n- 빈출 유형 및 자주 나오는 문제는 정답률이 높음\n- 선지 간 난이도 편차가 클 경우, 정답률은 높음\n- 오답 선지가 명백히 틀린 경우, 정답률은 높음\n\n"
             f"<출력 형식>\n- 정답률만 소수 둘째 자리까지 출력하십시오. (예: 0.73)\n- 그 외 설명이나 사족은 포함하지 마십시오.\n\n"
@@ -52,10 +55,15 @@ class CSATPromptDataset(Dataset):
             f"[보기]:\n{row['question_plus']}\n\n"
             f"[선택지]:\n1. {choices[0]}\n2. {choices[1]}\n3. {choices[2]}\n4. {choices[3]}\n5. {choices[4]}\n\n"
             f"[정답]:\n{row['answer']}\n\n"
-            f"[정답률]:\n{row['answer_rate']}"
+            f"[정답률]:\n"
         )
         text = re.sub(r"\[보기\]:\nnan\n\n", "", text)
-        return {"text": text}
+        labels = row["answer_rate"]
+        # # Check GPU quality
+        # cap_flag = check_cuda_capability()
+        # torch_dtype = torch.bfloat16 if cap_flag is True else torch.float16
+        # label = torch.tensor(row["answer_rate"], dtype=torch_dtype)
+        return {"text": text, "labels": labels}
 
 
 # Function to raw data into appropriate forms
@@ -68,6 +76,15 @@ def preprocess_month(question_id):
 def preprocess_c_rate(choices_rate):
     choices_rate = ast.literal_eval(choices_rate)
     return [0.01 * rate for rate in choices_rate]
+
+
+# Function to transform label into difficulty
+def label_to_diff(label):
+    return (
+        0
+        if label >= 0.90
+        else 1 if label >= 0.80 else 2 if label >= 0.60 else 3 if label >= 0.50 else 4
+    )
 
 
 # Function to preprocess given data
@@ -88,6 +105,7 @@ def load_data(data_path):
     csat_kor_df["question_id"] = csat_kor_df["question_id"].map(lambda x: int(x[4]))
     csat_kor_df["answer_rate"] = csat_kor_df["answer_rate"].map(lambda x: 0.01 * x)
     csat_kor_df["choices_rate"] = csat_kor_df["choices_rate"].map(preprocess_c_rate)
+    csat_kor_df["difficulty"] = csat_kor_df["answer_rate"].map(label_to_diff)
 
     # Reorder dataframe's columns
     new_order = [
@@ -101,6 +119,7 @@ def load_data(data_path):
         "answer",
         "answer_rate",
         "choices_rate",
+        "difficulty",
     ]
     csat_kor_df = csat_kor_df[new_order]
 
@@ -111,6 +130,6 @@ if __name__ == "__main__":
     dataset = "CSAT_Kor.csv"
     data_path = f"{parent_dir}/data/{dataset}"
     csat_kor_df = load_data(data_path)
-    csat_kor_dataset = CSATPromptDataset(csat_kor_df)
-    prompt_sample = csat_kor_dataset[0]
-    print(prompt_sample["text"])
+    csat_kor_dataset = CSATPromptDataset(csat_kor_df, 0)
+    print(csat_kor_dataset[0])
+    print()
