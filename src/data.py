@@ -6,11 +6,8 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Append to sys.path
 sys.path.append(parent_dir)
 
-from utils import check_cuda_capability
-
 from torch.utils.data import Dataset
 
-import torch
 import pandas as pd
 
 import ast
@@ -47,23 +44,19 @@ class CSATPromptDataset(Dataset):
         text = (
             f"{template}\n\n"
             f"<정답률 추정 기준>\n- 정보가 분산된 긴 지문일수록 난이도가 높음\n- 지문과 선택지의 대응이 명확할수록 정답률이 높음\n- 선택지들이 추상적이거나 유사한 표현일 경우 정답률이 낮음\n- 문제 유형이 추론이나 간접적 해석이면 난이도가 높음\n- 빈출 유형 및 자주 나오는 문제는 정답률이 높음\n- 선지 간 난이도 편차가 클 경우, 정답률은 높음\n- 오답 선지가 명백히 틀린 경우, 정답률은 높음\n\n"
-            f"<출력 형식>\n- 정답률만 소수 둘째 자리까지 출력하십시오. (예: 0.73)\n- 그 외 설명이나 사족은 포함하지 마십시오.\n\n"
             f"이 문제는 {row['year']}학년도 {row['month']}월에 출제된 국어 문제입니다.\n월별 시험 종류에 대한 정보는 다음과 같습니다.\n- 3월, 4월, 5월, 7월, 10월: 교육청 학력평가\n- 6월, 9월: 평가원 모의고사\n- 11월: 대학수학능력시험\n\n"
-            f"[지문]:\n{row['paragraph']}\n\n"
-            f"[문제 번호]:\n{row['question_id']}\n\n"
-            f"[문제]:\n{row['question']}\n\n"
-            f"[보기]:\n{row['question_plus']}\n\n"
-            f"[선택지]:\n1. {choices[0]}\n2. {choices[1]}\n3. {choices[2]}\n4. {choices[3]}\n5. {choices[4]}\n\n"
-            f"[정답]:\n{row['answer']}\n\n"
-            f"[정답률]:\n"
+            f"[지문]\n{row['paragraph']}\n\n"
+            f"[문제 번호]\n{row['question_id']}\n\n"
+            f"[문제]\n{row['question']}\n\n"
+            f"[보기]\n{row['question_plus']}\n\n"
+            f"[선택지]\n1. {choices[0]}\n2. {choices[1]}\n3. {choices[2]}\n4. {choices[3]}\n5. {choices[4]}\n\n"
+            f"[정답]\n{row['answer']}\n\n"
+            f"---\n\n"
+            f"[정답률]\n"
         )
         text = re.sub(r"\[보기\]:\nnan\n\n", "", text)
-        labels = row["answer_rate"]
-        # # Check GPU quality
-        # cap_flag = check_cuda_capability()
-        # torch_dtype = torch.bfloat16 if cap_flag is True else torch.float16
-        # label = torch.tensor(row["answer_rate"], dtype=torch_dtype)
-        return {"text": text, "labels": labels}
+        label = row["answer_rate"]
+        return {"text": text, "label": label}
 
 
 # Function to raw data into appropriate forms
