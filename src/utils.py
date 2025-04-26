@@ -6,7 +6,7 @@ import torch
 
 # Reproducibility
 def set_seed(seed):
-    # os.environ["PYTHONHASHEED"] = str(seed)
+    os.environ["PYTHONHASHEED"] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -14,6 +14,10 @@ def set_seed(seed):
         torch.cuda.manual_seed(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = True
+
+    # Option
+    if hasattr(torch, "use_deterministic_algorithm"):
+        torch.use_deterministic_algorithms(True)
 
 
 # Function to check cuda's quality

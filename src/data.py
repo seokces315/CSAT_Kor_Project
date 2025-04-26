@@ -96,7 +96,9 @@ def load_data(data_path):
     csat_kor_df["year"] = csat_kor_df["question_id"].map(lambda x: int(x[2]))
     csat_kor_df["month"] = csat_kor_df["question_id"].map(preprocess_month)
     csat_kor_df["question_id"] = csat_kor_df["question_id"].map(lambda x: int(x[4]))
-    csat_kor_df["answer_rate"] = csat_kor_df["answer_rate"].map(lambda x: 0.01 * x)
+    csat_kor_df["answer_rate"] = csat_kor_df["answer_rate"].map(
+        lambda x: round(0.01 * x, 2)
+    )
     csat_kor_df["choices_rate"] = csat_kor_df["choices_rate"].map(preprocess_c_rate)
     csat_kor_df["difficulty"] = csat_kor_df["answer_rate"].map(label_to_diff)
 

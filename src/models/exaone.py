@@ -5,24 +5,44 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers import BitsAndBytesConfig
 
 
+# Function for mean pooling
+def mean_pooling(last_hidden_state, attention_mask):
+    # Broadcasting
+    hidden_size = last_hidden_state.size()
+    expanded_attention_mask = attention_mask.unsqueeze(-1).expand(hidden_size)
+
+    # Zero-out & Sum given hidden states
+    sum_embeddings = (last_hidden_state * expanded_attention_mask).sum(dim=1)
+
+    # Count of non-masked tokens per sample
+    sum_mask = expanded_attention_mask.sum(dim=1).clamp(min=1e-9)
+
+    # Mean pooling
+    mean_embeddings = sum_embeddings / sum_mask
+
+    return mean_embeddings
+
+
 # Function to define Huber loss
 def compute_huber_loss(preds, labels, delta):
     assert len(preds) == len(labels)
 
     abs_error = torch.abs(preds - labels)
-    delta = torch.tensor(delta).to(abs_error.device)
-    mini = torch.minimum(abs_error, delta)
-    linear = abs_error - mini
-    loss = 0.5 * (mini**2) + delta * linear
-    loss = loss.mean()
+    delta = torch.tensor(delta, device=abs_error.device)
 
-    return loss
+    is_mini_error = abs_error <= delta
+
+    mini_error_loss = 0.5 * (abs_error**2)
+    big_error_loss = delta * (abs_error - 0.5 * delta)
+    loss = torch.where(is_mini_error, mini_error_loss, big_error_loss)
+
+    return loss.mean()
 
 
 # Custom model to fine-tune EXAONE on regression task
 class EXAONERegressionModel(nn.Module):
     # Generator
-    def __init__(self, model, delta):
+    def __init__(self, model, torch_dtype, delta):
         super().__init__()
         self.backbone = model
         hidden_size = self.backbone.config.hidden_size
@@ -30,23 +50,27 @@ class EXAONERegressionModel(nn.Module):
             nn.Linear(hidden_size, 1),
             nn.Sigmoid(),
         )
+        # self.regressor = self.regressor.to(dtype=torch_dtype)
         self.delta = delta
 
     # Forward with last hidden state's last token
-    def forward(self, input_dicts):
-        labels = input_dicts["labels"]
-        input_dicts = {
-            k: v
-            for k, v in input_dicts.items()
-            if k in ["input_ids", "attention_mask", "token_type_ids"]
-        }
+    def forward(self, input_ids=None, attention_mask=None, labels=None, **kwargs):
+        input_dicts = {"input_ids": input_ids, "attention_mask": attention_mask}
+
         outputs = self.backbone.base_model(**input_dicts)
-        pooled = outputs.last_hidden_state[:, -1, :]
+        pooled = mean_pooling(outputs.last_hidden_state, attention_mask)
+        # pooled = outputs.last_hidden_state[:, -1, :]
         preds = self.regressor(pooled).squeeze(-1)
 
         # Calculate huber loss
         loss = compute_huber_loss(preds, labels, self.delta)
         return {"loss": loss, "logits": preds}
+
+    # Dummy function
+    def prepare_inputs_for_generation(
+        self, input_ids=None, attention_mask=None, **kwargs
+    ):
+        return {"input_ids": input_ids, "attention_mask": attention_mask}
 
     @property
     def config(self):
@@ -98,6 +122,6 @@ def load_model(model_id, cap_flag, delta):
     # model.gradient_checkpointing_enable()
 
     # Create a child model for specific task
-    reg_model = EXAONERegressionModel(model, delta)
+    reg_model = EXAONERegressionModel(model, torch_dtype, delta)
 
     return tokenizer, reg_model

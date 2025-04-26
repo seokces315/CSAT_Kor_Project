@@ -15,6 +15,7 @@ def parse_args():
     parser.add_argument("--lora_alpha", default=8, type=int, help="Lora scaling")
     parser.add_argument("--lora_dropout", default=0.0, type=float, help="Dropout")
     parser.add_argument("--batch_size", default=8, type=int, help="Train batch size")
+    parser.add_argument("--cum_step", default=1, type=int, help="Accumulation steps")
     parser.add_argument("--epoch", default=3, type=int, help="Train epoch")
     parser.add_argument("--ls_type", default="linear", type=str, help="Scheduler type")
     parser.add_argument("--optim", default="adamw_torch", type=str, help="Optim type")

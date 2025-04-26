@@ -1,18 +1,38 @@
 from parser import parse_args
 from utils import set_seed, check_cuda_capability
 from data import parent_dir, load_data, CSATPromptDataset
-from models.exaone import EXAONERegressionModel, load_model
+from models.exaone import load_model
 
-from transformers import TrainingArguments, Trainer
+from transformers import TrainingArguments, Trainer, EarlyStoppingCallback
 from peft import LoraConfig, get_peft_model
 
 from sklearn.model_selection import train_test_split
-from functools import partial
+from sklearn.metrics import mean_absolute_error
 
 import torch
 
 import warnings
+import logging
+import wandb
+
 warnings.filterwarnings("ignore")
+logging.getLogger("transformers").setLevel(logging.ERROR)
+wandb.init(project="Exaone-finetuning")
+
+
+# Function to compute metrics
+def compute_metrics(eval_preds):
+    predictions, labels = eval_preds
+    predictions = predictions.squeeze()
+    labels = labels.squeeze()
+
+    correct = (abs(predictions - labels) <= 0.10).sum()
+    total = labels.shape[0]
+
+    accuracy = 1.0 * correct / total
+    mae = mean_absolute_error(labels, predictions)
+
+    return {"accuracy": accuracy, "mae": mae}
 
 
 # Function for LoRA settings
@@ -20,6 +40,7 @@ def get_lora_config(r, lora_alpha, lora_dropout):
     lora_config = LoraConfig(
         task_type="CAUSAL_LM",
         r=r,
+        target_modules=["q_proj", "v_proj"],  # GPT-series
         lora_alpha=lora_alpha,
         lora_dropout=lora_dropout,
         bias="none",
@@ -28,29 +49,32 @@ def get_lora_config(r, lora_alpha, lora_dropout):
 
 
 # Function to tokenize in custom settings
-def collate_fn(batch, tokenizer, max_length):
-    # Get data from batch
-    texts = [item["text"] for item in batch]
-    labels = [item["label"] for item in batch]
-
-    # Tokenizing
-    tokenized_texts = tokenizer(
-        texts,
-        padding=True,
-        truncation=True,
-        max_length=max_length,
-        return_tensors="pt",
-    )
-
+def wrap_collate_fn(tokenizer, max_length):
     # Check GPU quality
     cap_flag = check_cuda_capability()
     torch_dtype = torch.bfloat16 if cap_flag is True else torch.float16
 
-    return {
-        "input_ids": tokenized_texts["input_ids"],
-        "attention_mask": tokenized_texts["attention_mask"],
-        "labels": torch.tensor(labels, dtype=torch_dtype),
-    }
+    def collate_fn(batch):
+        # Get data from batch
+        texts = [item["text"] for item in batch]
+        labels = [item["label"] for item in batch]
+
+        # Tokenizing
+        tokenized_texts = tokenizer(
+            texts,
+            padding=True,
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
+        )
+
+        return {
+            "input_ids": tokenized_texts["input_ids"],
+            "attention_mask": tokenized_texts["attention_mask"],
+            "labels": torch.tensor(labels, dtype=torch_dtype),
+        }
+
+    return collate_fn
 
 
 # Main flow
@@ -88,10 +112,11 @@ def main(args, debug=False):
 
     # Define training arguments
     training_args = TrainingArguments(
-        output_dir="./results",
+        output_dir="./adapters",
         eval_strategy="steps",
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
+        gradient_accumulation_steps=args.cum_step,
         learning_rate=5e-05,
         weight_decay=0.0,
         max_grad_norm=1.0,
@@ -100,22 +125,34 @@ def main(args, debug=False):
         warmup_steps=0,
         logging_dir="./logs",
         logging_steps=50,
-        save_steps=50,
-        eval_steps=50,
+        save_steps=100,
+        data_seed=args.seed,
+        dataloader_drop_last=True,
+        eval_steps=100,
+        run_name="Exaone-finetuning",
+        disable_tqdm=False,
+        remove_unused_columns=False,
         load_best_model_at_end=True,
-        metric_for_best_model="eval_loss",
+        metric_for_best_model="eval_accuracy",
         greater_is_better=False,
         optim=args.optim,
         report_to="wandb",
+        full_determinism=True,
     )
 
     # Define trainer for training
     trainer = Trainer(
         model=model,
         args=training_args,
-        data_collator=partial(collate_fn, tokenizer, args.max_length),
+        data_collator=wrap_collate_fn(tokenizer, args.max_length),
         train_dataset=csat_kor_train_dataset,
         eval_dataset=csat_kor_test_dataset,
+        compute_metrics=compute_metrics,
+        callbacks=[
+            EarlyStoppingCallback(
+                early_stopping_patience=2, early_stopping_threshold=0.01
+            )
+        ],
     )
     if debug is True:
         model.print_trainable_parameters()
@@ -124,10 +161,6 @@ def main(args, debug=False):
     trainer.train()
 
     # Reload the best model
-    best_model = EXAONERegressionModel.from_pretrained("./results")
-    if debug is True:
-        print("Success!")
-        print()
 
 
 if __name__ == "__main__":
