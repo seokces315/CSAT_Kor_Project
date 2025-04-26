@@ -50,7 +50,7 @@ class EXAONERegressionModel(nn.Module):
             nn.Linear(hidden_size, 1),
             nn.Sigmoid(),
         )
-        # self.regressor = self.regressor.to(dtype=torch_dtype)
+        self.regressor = self.regressor.to(dtype=torch_dtype)
         self.delta = delta
 
     # Forward with last hidden state's last token
@@ -58,8 +58,8 @@ class EXAONERegressionModel(nn.Module):
         input_dicts = {"input_ids": input_ids, "attention_mask": attention_mask}
 
         outputs = self.backbone.base_model(**input_dicts)
-        pooled = mean_pooling(outputs.last_hidden_state, attention_mask)
         # pooled = outputs.last_hidden_state[:, -1, :]
+        pooled = mean_pooling(outputs.last_hidden_state, attention_mask)
         preds = self.regressor(pooled).squeeze(-1)
 
         # Calculate huber loss
