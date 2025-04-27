@@ -156,7 +156,7 @@ def main(args, debug=False):
         compute_metrics=compute_metrics,
         callbacks=[
             EarlyStoppingCallback(
-                early_stopping_patience=3, early_stopping_threshold=0.02
+                early_stopping_patience=3, early_stopping_threshold=0.01
             )
         ],
     )
