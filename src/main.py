@@ -22,11 +22,15 @@ wandb.init(project="Exaone-finetuning")
 
 # Function to compute metrics
 def compute_metrics(eval_preds):
+    # Unpacking
     predictions, labels = eval_preds
-    predictions = predictions.squeeze()
-    labels = labels.squeeze()
 
-    correct = (abs(predictions - labels) <= 0.10).sum()
+    # Dimension control
+    predictions = predictions.squeeze(-1)
+    labels = labels.squeeze(-1)
+
+    # Compute accuracy with specific metric
+    correct = (torch.abs(predictions - labels) <= 0.10).sum()
     total = labels.shape[0]
 
     accuracy = 1.0 * correct / total
@@ -104,7 +108,9 @@ def main(args, debug=False):
     # Load tokenizer & model
     cap_flag = check_cuda_capability()
     model_id = "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct"
-    tokenizer, model = load_model(model_id, cap_flag=cap_flag, delta=args.delta)
+    tokenizer, model = load_model(
+        model_id, cap_flag=cap_flag, loss_cat=args.loss_cat, delta=args.delta
+    )
 
     # Get peft model
     peft_config = get_lora_config(args.r, args.lora_alpha, args.lora_dropout)
@@ -112,7 +118,7 @@ def main(args, debug=False):
 
     # Define training arguments
     training_args = TrainingArguments(
-        output_dir="./adapters",
+        output_dir=args.output_dir,
         eval_strategy="steps",
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
@@ -122,19 +128,22 @@ def main(args, debug=False):
         max_grad_norm=1.0,
         num_train_epochs=args.epoch,
         lr_scheduler_type=args.ls_type,
-        warmup_steps=0,
+        warmup_steps=50,
         logging_dir="./logs",
+        logging_strategy="steps",
         logging_steps=50,
-        save_steps=100,
+        save_strategy="steps",
+        save_steps=50,
+        save_total_limit=1,
         data_seed=args.seed,
         dataloader_drop_last=True,
-        eval_steps=100,
+        eval_steps=50,
         run_name="Exaone-finetuning",
         disable_tqdm=False,
         remove_unused_columns=False,
         load_best_model_at_end=True,
         metric_for_best_model="eval_accuracy",
-        greater_is_better=False,
+        greater_is_better=True,
         optim=args.optim,
         report_to="wandb",
         full_determinism=True,
@@ -150,7 +159,7 @@ def main(args, debug=False):
         compute_metrics=compute_metrics,
         callbacks=[
             EarlyStoppingCallback(
-                early_stopping_patience=2, early_stopping_threshold=0.01
+                early_stopping_patience=3, early_stopping_threshold=0.02
             )
         ],
     )

@@ -2,5 +2,5 @@ data/*_Kor
 CSAT_Kor.csv
 __pycache__
 wandb/
-results/
+adapters/
 best.py
