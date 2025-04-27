@@ -26,8 +26,9 @@ def compute_metrics(eval_preds):
     predictions, labels = eval_preds
 
     # Dimension control
-    predictions = predictions.squeeze(-1)
-    labels = labels.squeeze(-1)
+    predictions = torch.tensor(predictions.squeeze())
+
+    labels = torch.tensor(labels.squeeze())
 
     # Compute accuracy with specific metric
     correct = (torch.abs(predictions - labels) <= 0.10).sum()
@@ -123,13 +124,9 @@ def main(args, debug=False):
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
         gradient_accumulation_steps=args.cum_step,
-        learning_rate=5e-05,
-        weight_decay=0.0,
-        max_grad_norm=1.0,
         num_train_epochs=args.epoch,
         lr_scheduler_type=args.ls_type,
         warmup_steps=50,
-        logging_dir="./logs",
         logging_strategy="steps",
         logging_steps=50,
         save_strategy="steps",
