@@ -1,8 +1,37 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers import BitsAndBytesConfig
+
+
+# Class for attention pooling
+class AttentionPooling(nn.Module):
+    # Generator
+    def __init__(self, hidden_dim):
+        super().__init__()
+        self.attn_fc = nn.Linear(hidden_dim, 1)
+
+    # Forward
+    def forward(self, last_hidden_state, attention_mask):
+        # Dtype conversion
+        attention_mask = attention_mask.to(dtype=last_hidden_state.dtype)
+
+        # Get attention scores
+        attn_scores = self.attn_fc(last_hidden_state)
+
+        # Ignore padding tokens
+        attention_mask = attention_mask.unsqueeze(-1)
+        attn_scores = attn_scores.masked_fill(attention_mask == 0, -1e9)
+
+        # Softmax over sequence
+        attn_weights = F.softmax(attn_scores, dim=1)
+
+        # Pooling
+        attn_embeddings = (last_hidden_state * attn_weights).sum(dim=1)
+
+        return attn_embeddings
 
 
 # Function for mean pooling
@@ -53,6 +82,7 @@ class EXAONERegressionModel(nn.Module):
         super().__init__()
         self.backbone = model
         hidden_size = self.backbone.config.hidden_size
+        self.attention_pooling = AttentionPooling(hidden_size)
         self.regressor = nn.Sequential(
             nn.Linear(hidden_size, 1),
             nn.Sigmoid(),
@@ -68,7 +98,8 @@ class EXAONERegressionModel(nn.Module):
 
         # Pooling (Last token, Mean pooling, ...)
         # pooled = outputs.last_hidden_state[:, -1, :]
-        pooled = mean_pooling(outputs.last_hidden_state, attention_mask)
+        # pooled = mean_pooling(outputs.last_hidden_state, attention_mask)
+        pooled = self.attention_pooling(outputs.last_hidden_state, attention_mask)
         preds = self.regressor(pooled).squeeze(-1)
 
         # Calculate loss

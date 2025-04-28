@@ -1,6 +1,6 @@
 from parser import parse_args
 from utils import set_seed, check_cuda_capability
-from data import parent_dir, load_data, CSATPromptDataset
+from data import parent_dir, CSATPromptDataset, label_to_diff, load_data
 from models.exaone import load_model
 
 from transformers import TrainingArguments, Trainer, EarlyStoppingCallback
@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
 
 import torch
+import numpy as np
 
 import warnings
 import logging
@@ -25,13 +26,17 @@ def compute_metrics(eval_preds):
     # Unpacking
     predictions, labels = eval_preds
 
+    # # For difficulty columns
+    # predictions = np.array([label_to_diff(p) for p in predictions])
+    # labels = np.array([label_to_diff(l) for l in labels])
+
     # Dimension control
     predictions = torch.tensor(predictions.squeeze())
-
     labels = torch.tensor(labels.squeeze())
 
     # Compute accuracy with specific metric
-    correct = (torch.abs(predictions - labels) <= 0.10).sum()
+    correct = ((predictions - labels) <= 0.10).sum()
+    # correct = (predictions == labels).sum()
     total = labels.shape[0]
 
     accuracy = 1.0 * correct / total
@@ -156,7 +161,7 @@ def main(args, debug=False):
         compute_metrics=compute_metrics,
         callbacks=[
             EarlyStoppingCallback(
-                early_stopping_patience=5, early_stopping_threshold=1e-9
+                early_stopping_patience=9, early_stopping_threshold=1e-9
             )
         ],
     )
