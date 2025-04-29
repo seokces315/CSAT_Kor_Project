@@ -9,9 +9,10 @@ from transformers import BitsAndBytesConfig
 # Class for attention pooling
 class AttentionPooling(nn.Module):
     # Generator
-    def __init__(self, hidden_dim):
+    def __init__(self, torch_dtype, hidden_dim):
         super().__init__()
         self.attn_fc = nn.Linear(hidden_dim, 1)
+        self.attn_fc = self.attn_fc.to(dtype=torch_dtype)
 
     # Forward
     def forward(self, last_hidden_state, attention_mask):
@@ -82,7 +83,7 @@ class EXAONERegressionModel(nn.Module):
         super().__init__()
         self.backbone = model
         hidden_size = self.backbone.config.hidden_size
-        self.attention_pooling = AttentionPooling(hidden_size)
+        self.attention_pooling = AttentionPooling(torch_dtype, hidden_size)
         self.regressor = nn.Sequential(
             nn.Linear(hidden_size, 1),
             nn.Sigmoid(),

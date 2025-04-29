@@ -35,7 +35,7 @@ def compute_metrics(eval_preds):
     labels = torch.tensor(labels.squeeze())
 
     # Compute accuracy with specific metric
-    correct = ((predictions - labels) <= 0.10).sum()
+    correct = (torch.abs(predictions - labels) <= 0.10).sum()
     # correct = (predictions == labels).sum()
     total = labels.shape[0]
 
