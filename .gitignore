@@ -4,3 +4,4 @@ __pycache__
 wandb/
 adapters/
 best.py
+catboost_info/

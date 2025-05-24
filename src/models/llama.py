@@ -82,7 +82,7 @@ def compute_huber_loss(preds, labels, delta):
 
 
 # Custom model to fine-tune EXAONE on regression task
-class EXAONERegressionModel(nn.Module):
+class LlamaRegressionModel(nn.Module):
     # Generator
     def __init__(self, model, torch_dtype, loss_cat, delta):
         super().__init__()
@@ -102,10 +102,9 @@ class EXAONERegressionModel(nn.Module):
     # Forward with last hidden state's last token
     def forward(self, input_ids=None, attention_mask=None, labels=None, **kwargs):
         input_dicts = {"input_ids": input_ids, "attention_mask": attention_mask}
-        outputs = self.backbone.base_model(**input_dicts)
+        outputs = self.backbone(**input_dicts)
 
         # Pooling (Last token, Mean pooling, ...)
-        # pooled = outputs.last_hidden_state[:, -1, :]
         # pooled = mean_pooling(outputs.last_hidden_state, attention_mask)
         pooled = self.attention_pooling(outputs.last_hidden_state, attention_mask)
         acum_token = outputs.last_hidden_state[:, -1, :]
@@ -123,12 +122,6 @@ class EXAONERegressionModel(nn.Module):
             loss = compute_huber_loss(preds, labels, self.delta)
 
         return {"loss": loss, "logits": preds}
-
-    # Dummy function
-    def prepare_inputs_for_generation(
-        self, input_ids=None, attention_mask=None, **kwargs
-    ):
-        return {"input_ids": input_ids, "attention_mask": attention_mask}
 
     @property
     def config(self):
@@ -180,6 +173,6 @@ def load_model(model_id, cap_flag, loss_cat, delta):
     # model.gradient_checkpointing_enable()
 
     # Create a child model for specific task
-    reg_model = EXAONERegressionModel(model, torch_dtype, loss_cat, delta)
+    reg_model = LlamaRegressionModel(model, torch_dtype, loss_cat, delta)
 
     return tokenizer, reg_model

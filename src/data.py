@@ -11,7 +11,6 @@ from torch.utils.data import Dataset
 import pandas as pd
 
 import ast
-import re
 
 
 # Function for role & persona template
@@ -69,7 +68,7 @@ class CSATPromptDataset(Dataset):
             # f"---\n\n"
             # f"[정답률]\n"
         )
-        text = re.sub(r"\[보기\]\nnan\n\n", "", text)
+        text = text.replace("[보기]\nnan\n", "")
         label = row["answer_rate"]
         return {"text": text, "label": label}
 

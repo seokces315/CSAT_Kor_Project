@@ -1,7 +1,9 @@
 from parser import parse_args
 from utils import set_seed, check_cuda_capability
 from data import parent_dir, CSATPromptDataset, label_to_diff, load_data
-from models.exaone import load_model
+
+# from models.exaone import load_model
+from models.llama import load_model
 
 from transformers import TrainingArguments, Trainer, EarlyStoppingCallback
 from peft import LoraConfig, get_peft_model
@@ -113,7 +115,8 @@ def main(args, debug=False):
 
     # Load tokenizer & model
     cap_flag = check_cuda_capability()
-    model_id = "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct"
+    # model_id = "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct"
+    model_id = "meta-llama/Llama-3.1-8B-Instruct"
     tokenizer, model = load_model(
         model_id, cap_flag=cap_flag, loss_cat=args.loss_cat, delta=args.delta
     )
@@ -144,8 +147,8 @@ def main(args, debug=False):
         disable_tqdm=False,
         remove_unused_columns=False,
         load_best_model_at_end=True,
-        metric_for_best_model="eval_accuracy",
-        greater_is_better=True,
+        metric_for_best_model="eval_mae",
+        greater_is_better=False,
         optim=args.optim,
         report_to="wandb",
         full_determinism=True,
@@ -161,7 +164,7 @@ def main(args, debug=False):
         compute_metrics=compute_metrics,
         callbacks=[
             EarlyStoppingCallback(
-                early_stopping_patience=9, early_stopping_threshold=1e-9
+                early_stopping_patience=13, early_stopping_threshold=1e-9
             )
         ],
     )
@@ -170,8 +173,6 @@ def main(args, debug=False):
 
     # Train process
     trainer.train()
-
-    # Reload the best model
 
 
 if __name__ == "__main__":
