@@ -10,6 +10,7 @@ def parse_args():
     parser.add_argument("--option", default=0, type=int, help="Option for template")
     parser.add_argument("--test_size", default=0.2, type=float, help="Test data split")
     parser.add_argument("--max_length", default=2048, type=int, help="Tokenizer")
+    parser.add_argument("--model_id", default="exaone", type=str, help="Model")
     parser.add_argument("--loss_cat", default="huber", type=str, help="Loss category")
     parser.add_argument("--delta", default=1.0, type=float, help="Huber loss")
     parser.add_argument("--r", default=8, type=int, help="Lora attention dimension")

@@ -2,8 +2,7 @@ from parser import parse_args
 from utils import set_seed, check_cuda_capability
 from data import parent_dir, CSATPromptDataset, label_to_diff, load_data
 
-# from models.exaone import load_model
-from models.llama import load_model
+from models.model import load_model
 
 from transformers import TrainingArguments, Trainer, EarlyStoppingCallback
 from peft import LoraConfig, get_peft_model
@@ -115,8 +114,12 @@ def main(args, debug=False):
 
     # Load tokenizer & model
     cap_flag = check_cuda_capability()
-    # model_id = "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct"
-    model_id = "meta-llama/Llama-3.1-8B-Instruct"
+    if args.model_id == "exaone":
+        model_id = "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct"
+    elif args.model_id == "llama":
+        model_id = "meta-llama/Llama-3.1-8B-Instruct"
+    else:
+        model_id = "Qwen/Qwen3-8B"
     tokenizer, model = load_model(
         model_id, cap_flag=cap_flag, loss_cat=args.loss_cat, delta=args.delta
     )
