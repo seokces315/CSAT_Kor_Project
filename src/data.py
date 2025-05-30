@@ -59,16 +59,18 @@ class CSATPromptDataset(Dataset):
             # f"<정답률 추정 기준>\n- 정보가 분산된 긴 지문일수록 난이도가 높음\n- 지문과 선택지의 대응이 명확할수록 정답률이 높음\n- 선택지들이 추상적이거나 유사한 표현일 경우 정답률이 낮음\n- 문제 유형이 추론이나 간접적 해석이면 난이도가 높음\n- 빈출 유형 및 자주 나오는 문제는 정답률이 높음\n- 선지 간 난이도 편차가 클 경우, 정답률은 높음\n- 오답 선지가 명백히 틀린 경우, 정답률은 높음\n\n"
             # f"<출력 형식>\n- 정답률만 소수 둘째 자리까지 출력하십시오. (예: 0.73)\n- 그 외 설명이나 사족은 포함하지 마십시오.\n\n"
             f"[시험 종류] {row['year']}학년도 {row['month']}월 {style}\n\n"
-            f"[지문]\n{row['paragraph']}\n\n"
             # f"[문제 번호]\n{row['question_id']}\n\n"
+            # f"[지문]\n{row['paragraph']}\n\n"
             f"[문제]\n{row['question']}\n\n"
             f"[보기]\n{row['question_plus']}\n\n"
-            f"[선택지]\n1. {choices[0]}\n2. {choices[1]}\n3. {choices[2]}\n4. {choices[3]}\n5. {choices[4]}"
-            # f"[정답]\n{row['answer']}\n\n"
+            f"[선택지]\n1. {choices[0]}\n2. {choices[1]}\n3. {choices[2]}\n4. {choices[3]}\n5. {choices[4]}\n\n"
+            f"[정답]\n{row['answer']}\n\n"
+            # f"[정답]\n{row['answer']}"
+            f"[지문]\n{row['paragraph']}"
             # f"---\n\n"
             # f"[정답률]\n"
         )
-        text = text.replace("[보기]\nnan\n", "")
+        text = text.replace("[보기]\nnan\n\n", "")
         label = row["answer_rate"]
         return {"text": text, "label": label}
 
@@ -141,5 +143,5 @@ if __name__ == "__main__":
     csat_kor_df = load_data(data_path)
     # csat_kor_df.to_csv("CSAT_Kor.csv", index=False, encoding="utf-8")
     csat_kor_dataset = CSATPromptDataset(csat_kor_df, 0)
-    print(csat_kor_dataset[0]["text"])
+    print(len(csat_kor_dataset))
     print()

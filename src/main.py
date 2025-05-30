@@ -8,7 +8,7 @@ from transformers import TrainingArguments, Trainer, EarlyStoppingCallback
 from peft import LoraConfig, get_peft_model
 
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
 
 import torch
 import numpy as np
@@ -41,9 +41,10 @@ def compute_metrics(eval_preds):
     total = labels.shape[0]
 
     accuracy = 1.0 * correct / total
-    mae = mean_absolute_error(labels, predictions)
+    mape = mean_absolute_percentage_error(labels, predictions)
+    mse = mean_squared_error(labels, predictions)
 
-    return {"accuracy": accuracy, "mae": mae}
+    return {"mse": mse, "mape": mape, "accuracy": accuracy}
 
 
 # Function for LoRA settings
@@ -150,7 +151,7 @@ def main(args, debug=False):
         disable_tqdm=False,
         remove_unused_columns=False,
         load_best_model_at_end=True,
-        metric_for_best_model="eval_mae",
+        metric_for_best_model="mape",
         greater_is_better=False,
         optim=args.optim,
         report_to="wandb",

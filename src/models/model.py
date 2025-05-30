@@ -101,7 +101,7 @@ def load_model(model_id, cap_flag, loss_cat, delta):
     # Prepare tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "right"
+    tokenizer.padding_side = "right" 
 
     # Use cap_flag
     if cap_flag:
